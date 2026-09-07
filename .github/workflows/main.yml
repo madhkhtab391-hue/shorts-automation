@@ -1,4 +1,4 @@
-name: Create Short Test
+name: Create Kids Short - Arabic
 
 on:
   workflow_dispatch:
@@ -17,7 +17,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y jq ffmpeg fonts-noto-core fonts-noto-extra
-          python3 -m pip install --upgrade edge-tts
+          python3 -m pip install --user edge-tts
 
       - name: Download video
         run: |
@@ -25,18 +25,23 @@ jobs:
           echo "Downloading video..."
           curl -L "$VIDEO_URL" -o original.mp4
 
+      - name: Create Arabic script
+        run: |
+          cat > script.txt <<'EOF'
+          هل تعرف أن بعض الديناصورات كانت أكبر من الحافلة؟
+          تخيل ديناصورًا ضخمًا يمشي بجانبك!
+          يا ترى، ما أكبر ديناصور عاش على الأرض؟
+          EOF
+
       - name: Create Arabic voice
         run: |
-          echo "الطبيعة تمنحنا لحظات جميلة تستحق أن نتوقف ونستمتع بها." > script.txt
-
-          edge-tts \
+          python3 -m edge_tts \
             --voice ar-JO-TaimNeural \
             --rate=-5% \
-            --volume=+0% \
             --text "$(cat script.txt)" \
             --write-media voice.mp3
 
-      - name: Create subtitles
+      - name: Create captions
         run: |
           cat > captions.ass <<'EOF'
           [Script Info]
@@ -50,7 +55,9 @@ jobs:
 
           [Events]
           Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-          Dialogue: 0,0:00:00.00,0:00:10.00,Default,,0,0,0,,الطبيعة تمنحنا لحظات جميلة تستحق أن نتوقف ونستمتع بها.
+          Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,هل تعرف أن بعض الديناصورات كانت أكبر من الحافلة؟
+          Dialogue: 0,0:00:05.00,0:00:10.00,Default,,0,0,0,,تخيل ديناصورًا ضخمًا يمشي بجانبك!
+          Dialogue: 0,0:00:10.00,0:00:15.00,Default,,0,0,0,,يا ترى، ما أكبر ديناصور عاش على الأرض؟
           EOF
 
       - name: Create Short
@@ -61,7 +68,7 @@ jobs:
             -vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,subtitles=captions.ass" \
             -map 0:v:0 \
             -map 1:a:0 \
-            -t 10 \
+            -t 15 \
             -c:v libx264 \
             -preset veryfast \
             -crf 23 \
@@ -81,5 +88,5 @@ jobs:
       - name: Upload Short
         uses: actions/upload-artifact@v4
         with:
-          name: generated-short
+          name: arabic-kids-dinosaur-short
           path: short.mp4
