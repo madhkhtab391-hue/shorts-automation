@@ -13,10 +13,10 @@ jobs:
         run: |
           curl -L "https://orange-cherry-5bc8.madhkhtab391.workers.dev/pexels" -o videos.json
 
-      - name: Install jq and FFmpeg
+      - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y jq ffmpeg
+          sudo apt-get install -y jq ffmpeg espeak-ng fonts-noto-core fonts-noto-extra
 
       - name: Download video
         run: |
@@ -24,20 +24,55 @@ jobs:
           echo "Downloading video..."
           curl -L "$VIDEO_URL" -o original.mp4
 
-      - name: Check FFmpeg
+      - name: Create Arabic voice
         run: |
-          ffmpeg -version
+          echo "الطبيعة تمنحنا لحظات جميلة تستحق أن نتوقف ونستمتع بها." > script.txt
+
+          espeak-ng \
+            -v ar \
+            -s 145 \
+            -p 50 \
+            -f script.txt \
+            -w voice.wav
+
+      - name: Create subtitles
+        run: |
+          cat > captions.ass <<'EOF'
+          [Script Info]
+          ScriptType: v4.00+
+          PlayResX: 1080
+          PlayResY: 1920
+
+          [V4+ Styles]
+          Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Alignment, MarginL, MarginR, MarginV, Encoding
+          Style: Default,Noto Sans Arabic,70,&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,1,0,2,60,60,180,1
+
+          [Events]
+          Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+          Dialogue: 0,0:00:00.00,0:00:10.00,Default,,0,0,0,,الطبيعة تمنحنا لحظات جميلة تستحق أن نتوقف ونستمتع بها.
+          EOF
 
       - name: Create Short
         run: |
-          ffmpeg -i original.mp4 \
-            -vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920" \
+          ffmpeg -y \
+            -i original.mp4 \
+            -i voice.wav \
+            -vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,subtitles=captions.ass" \
+            -map 0:v:0 \
+            -map 1:a:0 \
+            -t 10 \
             -c:v libx264 \
             -preset veryfast \
             -crf 23 \
             -c:a aac \
             -b:a 128k \
+            -shortest \
             short.mp4
+
+      - name: Check output
+        run: |
+          ls -lh short.mp4
+          ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1 short.mp4
 
       - name: Upload Short
         uses: actions/upload-artifact@v4
