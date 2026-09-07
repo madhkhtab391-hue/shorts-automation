@@ -1,45 +1,54 @@
-name: Create Kids Short - Arabic
+name: Create Kids Dino Short
 
 on:
   workflow_dispatch:
-    inputs: {}
 
 jobs:
   create-short:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Get video from Cloudflare Worker
-        run: |
-          curl -L "https://orange-cherry-5bc8.madhkhtab391.workers.dev/pexels" -o videos.json
+      - name: Download project
+        uses: actions/checkout@v4
 
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y jq ffmpeg fonts-noto-core fonts-noto-extra
+          sudo apt-get install -y ffmpeg fonts-noto-core fonts-noto-extra
           python3 -m pip install --user edge-tts
 
-      - name: Download video
+      - name: Check image
         run: |
-          VIDEO_URL=$(jq -r '.[0].videoUrl' videos.json)
-          echo "Downloading video..."
-          curl -L "$VIDEO_URL" -o original.mp4
-
-      - name: Create Arabic script
-        run: |
-          cat > script.txt <<'EOF'
-          هل تعرف أن بعض الديناصورات كانت أكبر من الحافلة؟
-          تخيل ديناصورًا ضخمًا يمشي بجانبك!
-          يا ترى، ما أكبر ديناصور عاش على الأرض؟
-          EOF
+          test -f assets/dino-kids.png
+          echo "Kids image found:"
+          ls -lh assets/dino-kids.png
 
       - name: Create Arabic voice
         run: |
-          python3 -m edge_tts \
+          echo "هل تعرف إن بعض الديناصورات كانت أكبر من الحافلة؟ واو! تخيل حجمها!" > script.txt
+          ~/.local/bin/edge-tts \
             --voice ar-JO-TaimNeural \
             --rate=-5% \
+            --volume=+0% \
             --text "$(cat script.txt)" \
             --write-media voice.mp3
+
+      - name: Create playful music
+        run: |
+          ffmpeg -y \
+            -f lavfi -i "sine=frequency=523:duration=20" \
+            -f lavfi -i "sine=frequency=659:duration=20" \
+            -f lavfi -i "sine=frequency=784:duration=20" \
+            -filter_complex "[0:a][1:a][2:a]amix=inputs=3:duration=longest,volume=0.045,afade=t=in:st=0:d=1,afade=t=out:st=18:d=2" \
+            -c:a libmp3lame -b:a 128k music.mp3
+
+      - name: Create sound effects
+        run: |
+          ffmpeg -y \
+            -f lavfi -i "sine=frequency=880:duration=0.18" \
+            -f lavfi -i "sine=frequency=1200:duration=0.18" \
+            -filter_complex "[0:a]afade=t=out:st=0.08:d=0.10[a];[1:a]afade=t=out:st=0.08:d=0.10[b];[a][b]concat=n=2:v=0:a=1,volume=0.5" \
+            -c:a libmp3lame -b:a 128k pop.mp3
 
       - name: Create captions
         run: |
@@ -51,30 +60,40 @@ jobs:
 
           [V4+ Styles]
           Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Alignment, MarginL, MarginR, MarginV, Encoding
-          Style: Default,Noto Sans Arabic,70,&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,1,0,2,60,60,180,1
+          Style: Default,Noto Sans Arabic,72,&H00FFFFFF,&H00FFFFFF,&H001E1E1E,&H99000000,1,0,2,55,55,250,1
 
           [Events]
           Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-          Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,هل تعرف أن بعض الديناصورات كانت أكبر من الحافلة؟
-          Dialogue: 0,0:00:05.00,0:00:10.00,Default,,0,0,0,,تخيل ديناصورًا ضخمًا يمشي بجانبك!
-          Dialogue: 0,0:00:10.00,0:00:15.00,Default,,0,0,0,,يا ترى، ما أكبر ديناصور عاش على الأرض؟
+          Dialogue: 0,0:00:00.00,0:00:03.50,Default,,0,0,0,,هل تعرف؟ 🦖
+          Dialogue: 0,0:00:03.50,0:00:10.50,Default,,0,0,0,,بعض الديناصورات كانت أكبر من الحافلة! 🚌
+          Dialogue: 0,0:00:10.50,0:00:16.50,Default,,0,0,0,,تخيل حجمها! 😲
+          Dialogue: 0,0:00:16.50,0:00:20.00,Default,,0,0,0,,واو! عالم الديناصورات ممتع! 🌋
           EOF
 
-      - name: Create Short
+      - name: Create 20 second Short
         run: |
           ffmpeg -y \
-            -i original.mp4 \
+            -loop 1 -i assets/dino-kids.png \
             -i voice.mp3 \
-            -vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,subtitles=captions.ass" \
-            -map 0:v:0 \
-            -map 1:a:0 \
-            -t 15 \
+            -i music.mp3 \
+            -i pop.mp3 \
+            -filter_complex "\
+            [0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,\
+            zoompan=z='min(zoom+0.0008,1.12)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=1080x1920:fps=30,\
+            subtitles=captions.ass[v];\
+            [1:a]volume=1.0[voice];\
+            [2:a]volume=0.35[music];\
+            [3:a]adelay=3500|3500,volume=0.7[pop];\
+            [music][voice][pop]amix=inputs=3:duration=longest:dropout_transition=2[a]" \
+            -map "[v]" \
+            -map "[a]" \
+            -t 20 \
             -c:v libx264 \
             -preset veryfast \
-            -crf 23 \
+            -crf 22 \
+            -pix_fmt yuv420p \
             -c:a aac \
-            -b:a 128k \
-            -shortest \
+            -b:a 160k \
             short.mp4
 
       - name: Check output
@@ -82,11 +101,10 @@ jobs:
           ls -lh short.mp4
           ffprobe -v error \
             -show_entries format=duration \
-            -of default=noprint_wrappers=1 \
-            short.mp4
+            -of default=noprint_wrappers=1 short.mp4
 
       - name: Upload Short
         uses: actions/upload-artifact@v4
         with:
-          name: arabic-kids-dinosaur-short
+          name: kids-dino-short
           path: short.mp4
