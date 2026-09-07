@@ -2,6 +2,7 @@ name: Create Short Test
 
 on:
   workflow_dispatch:
+    inputs: {}
 
 jobs:
   create-short:
