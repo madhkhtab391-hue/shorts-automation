@@ -13,10 +13,10 @@ jobs:
         run: |
           curl -L "https://orange-cherry-5bc8.madhkhtab391.workers.dev/pexels" -o videos.json
 
-      - name: Install jq
+      - name: Install jq and FFmpeg
         run: |
           sudo apt-get update
-          sudo apt-get install -y jq
+          sudo apt-get install -y jq ffmpeg
 
       - name: Download video
         run: |
