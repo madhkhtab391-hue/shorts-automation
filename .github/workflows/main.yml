@@ -16,7 +16,8 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y jq ffmpeg espeak-ng fonts-noto-core fonts-noto-extra
+          sudo apt-get install -y jq ffmpeg fonts-noto-core fonts-noto-extra
+          python3 -m pip install --upgrade edge-tts
 
       - name: Download video
         run: |
@@ -28,12 +29,12 @@ jobs:
         run: |
           echo "الطبيعة تمنحنا لحظات جميلة تستحق أن نتوقف ونستمتع بها." > script.txt
 
-          espeak-ng \
-            -v ar \
-            -s 145 \
-            -p 50 \
-            -f script.txt \
-            -w voice.wav
+          edge-tts \
+            --voice ar-JO-TaimNeural \
+            --rate=-5% \
+            --volume=+0% \
+            --text "$(cat script.txt)" \
+            --write-media voice.mp3
 
       - name: Create subtitles
         run: |
@@ -56,7 +57,7 @@ jobs:
         run: |
           ffmpeg -y \
             -i original.mp4 \
-            -i voice.wav \
+            -i voice.mp3 \
             -vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,subtitles=captions.ass" \
             -map 0:v:0 \
             -map 1:a:0 \
@@ -72,7 +73,10 @@ jobs:
       - name: Check output
         run: |
           ls -lh short.mp4
-          ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1 short.mp4
+          ffprobe -v error \
+            -show_entries format=duration \
+            -of default=noprint_wrappers=1 \
+            short.mp4
 
       - name: Upload Short
         uses: actions/upload-artifact@v4
