@@ -1,0 +1,45 @@
+name: Create Short Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  create-short:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get video from Cloudflare Worker
+        run: |
+          curl -L "https://orange-cherry-5bc8.madhkhtab391.workers.dev/pexels" -o videos.json
+
+      - name: Install jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Download video
+        run: |
+          VIDEO_URL=$(jq -r '.[0].videoUrl' videos.json)
+          echo "Downloading video..."
+          curl -L "$VIDEO_URL" -o original.mp4
+
+      - name: Check FFmpeg
+        run: |
+          ffmpeg -version
+
+      - name: Create Short
+        run: |
+          ffmpeg -i original.mp4 \
+            -vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920" \
+            -c:v libx264 \
+            -preset veryfast \
+            -crf 23 \
+            -c:a aac \
+            -b:a 128k \
+            short.mp4
+
+      - name: Upload Short
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-short
+          path: short.mp4
